@@ -1,0 +1,298 @@
+<!DOCTYPE html>
+<html xmlns="http://www.w3.org/1999/xhtml">
+   <head>
+      <meta http-equiv="Content-Type" content="text/html; charset=utf-8" />
+      <title>Daniel Haines: Web Developer</title>
+   </head>
+   <body style="overscroll-behavior-y: none; overscroll-behavior: contain; overflow: hidden; text-align:center; margin: 0; padding: 0; border: 0; background-color:#000;">
+      <canvas id="myCanvas" style="width: 100%; height: 100%; position:absolute; top: 0px; left: 0px;">
+         Your browser does not support the canvas element.
+      </canvas>
+      <div id="desc" style="pointer-events: none; position: absolute; top: 3em; width: 100%;">
+         <div style="position:relative; background-color: rgba(255,255,255,0.9); display:inline-block; width: 700px; padding: 25px; border-radius: 20px;">
+            <h3><a style="pointer-events: auto; cursor:pointer; position:absolute; top:.5em; right:1em;" onclick="document.getElementById('desc').style.display='none';">X</a></h3>
+            <p>Hello, this is the beginning of a large project which for now serves to showcase my JavaScript skills. My end goal is to create a tool of value that has visual appeal and is easy to use. Below is a demo I've created for mouse tracking and heatmap visualization. This is all written in pure JavaScript and only relies on the CPU. I've improvised a lot to make this work smoothly. Furthermore, all data generated is easily stored and replayed with little burden on bandwidth. Check it out, I hope you like it.</p>
+         </div>
+      </div>
+      <script>
+         //All of this code needs refactored but it works nicely as a visual demo
+         var blurimg = function(imgctx) {
+             /*Since I'm using only red I'll just blur the red data by adding together 4 consectitive pixels and shifting to the right 2 places.
+             This has to be done in both directions on both axis.
+             The First pixel in the given direction needs to be checked as to not waste time blurring black into more black.*/
+             //get size info
+             var imgWidth = imgctx.canvas.width;
+             var imgHeight = imgctx.canvas.height;
+             var pixels = imgctx.getImageData(0, 0, imgWidth, imgHeight);
+             var d = pixels.data;
+             //this is the length of an entire row, which we'll use to traverse the coloms of pixel data.
+             var y = imgWidth * 4;
+             var dlen = d.length;
+             for (var i = 0; i < dlen; i += 4) {
+                 var j = dlen - i;
+                 //x left to right
+                 if (d[i]) {
+                     d[i] = d[i + 4] = d[i + 8] = d[i + 12] = (d[i] + d[i + 4] + d[i + 8] + d[i + 12]) >> 2;
+                 }
+                 //x right to left.
+                 if (d[j + 12]) {
+                     d[j] = d[j + 4] = d[j + 8] = d[j + 12] = (d[j] + d[j + 4] + d[j + 8] + d[j + 12]) >> 2;
+                 }
+                 //y top to bottom
+                 if (d[i]) {
+                     d[i] = d[i + y] = d[i + y + y] = d[i + y + y + y] = (d[i] + d[i + y] + d[i + y + y] + d[i + y + y + y]) >> 2;
+                 }
+                 //y bottom to top
+                 if (d[j + y + y + y]) {
+                     d[j] = d[j + y] = d[j + y + y] = d[j + y + y + y] = (d[j] + d[j + y] + d[j + y + y] + d[j + y + y + y]) >> 2;
+                 }
+             }
+             imgctx.putImageData(pixels, 0, 0, 0, 0, imgWidth, imgHeight);
+             return 1;
+         };
+         var heatmap = function(imgctx) {
+             var imgWidth = imgctx.canvas.clientWidth;
+             var imgHeight = imgctx.canvas.clientHeight;
+             //These arrays of 255 values each make up a 7 point heatmap color gradient wich is used to quicky convert 0-255 into a gradient
+             var rl = new Uint8Array([0, 0, 0, 0, 0, 0, 0, 1, 2, 4, 7, 13, 18, 21, 23, 23, 24, 23, 23, 22, 19, 15, 12, 10, 9, 10, 13, 16, 19, 22, 24, 26, 27, 27, 28, 28, 28, 30, 30, 31, 31, 32, 33, 34, 35, 37, 38, 39, 40, 41, 43, 45, 47, 48, 48, 47, 45, 44, 45, 47, 51, 58, 68, 78, 87, 94, 100, 104, 106, 105, 102, 100, 98, 96, 94, 93, 92, 91, 89, 87, 85, 83, 81, 79, 77, 76, 75, 74, 72, 71, 69, 68, 66, 63, 60, 58, 57, 56, 55, 54, 53, 52, 51, 50, 49, 48, 46, 45, 44, 43, 42, 42, 42, 42, 41, 41, 41, 41, 40, 40, 40, 39, 39, 38, 38, 39, 40, 43, 47, 51, 56, 60, 65, 72, 82, 93, 103, 113, 121, 129, 137, 145, 154, 162, 170, 178, 186, 195, 204, 212, 220, 227, 231, 232, 232, 232, 233, 234, 235, 235, 235, 235, 235, 235, 235, 235, 234, 234, 233, 233, 232, 231, 231, 230, 230, 229, 228, 226, 225, 224, 223, 222, 222, 221, 221, 221, 221, 221, 220, 220, 219, 219, 219, 218, 217, 217, 217, 217, 217, 217, 217, 217, 216, 216, 216, 216, 216, 216, 216, 216, 216, 216, 216, 216, 216, 216, 217, 218, 220, 222, 222, 223, 224, 224, 225, 225, 226, 227, 228, 230, 232, 233, 236, 238, 239, 240, 242, 244, 246, 248, 249, 250, 251, 252, 253, 254, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255]);
+             var gl = new Uint8Array([0, 0, 0, 0, 0, 0, 1, 2, 3, 7, 14, 23, 32, 37, 40, 41, 43, 43, 44, 45, 46, 47, 48, 50, 53, 56, 59, 62, 64, 66, 67, 68, 69, 70, 70, 71, 71, 73, 74, 77, 79, 82, 85, 88, 91, 94, 98, 101, 105, 109, 114, 120, 127, 134, 142, 148, 155, 161, 167, 171, 175, 178, 181, 183, 184, 186, 186, 187, 187, 186, 186, 185, 185, 184, 184, 183, 183, 182, 181, 180, 180, 179, 179, 178, 177, 177, 176, 175, 174, 173, 173, 172, 172, 171, 170, 170, 169, 169, 168, 168, 167, 167, 166, 166, 165, 165, 164, 163, 162, 161, 160, 158, 157, 156, 155, 154, 153, 151, 149, 148, 146, 145, 144, 143, 143, 143, 144, 146, 149, 152, 154, 157, 160, 164, 168, 171, 174, 177, 180, 184, 186, 189, 191, 195, 198, 202, 205, 208, 212, 215, 219, 221, 222, 221, 219, 216, 213, 210, 206, 201, 197, 193, 188, 182, 177, 172, 168, 164, 161, 157, 154, 149, 144, 138, 132, 127, 122, 118, 114, 110, 106, 103, 98, 94, 90, 85, 82, 78, 75, 72, 68, 64, 60, 56, 53, 49, 46, 43, 41, 39, 37, 36, 34, 33, 33, 34, 36, 38, 41, 44, 48, 53, 58, 62, 67, 72, 78, 83, 87, 92, 97, 102, 107, 112, 117, 123, 129, 134, 140, 146, 153, 161, 169, 176, 183, 189, 195, 201, 209, 217, 225, 231, 238, 244, 249, 253, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255]);
+             var bl = new Uint8Array([0, 0, 0, 0, 0, 1, 2, 4, 9, 18, 34, 54, 70, 80, 85, 89, 91, 95, 99, 105, 111, 117, 123, 127, 131, 135, 138, 141, 144, 145, 145, 145, 145, 146, 147, 147, 148, 150, 151, 153, 156, 158, 159, 160, 160, 161, 163, 166, 169, 174, 178, 183, 188, 193, 198, 202, 206, 211, 214, 215, 215, 213, 212, 210, 209, 206, 203, 201, 199, 196, 194, 191, 188, 185, 182, 179, 176, 174, 171, 168, 165, 162, 158, 155, 152, 149, 146, 143, 141, 139, 136, 134, 130, 126, 123, 119, 116, 112, 109, 104, 100, 97, 94, 91, 88, 84, 81, 77, 73, 69, 65, 62, 60, 59, 57, 57, 57, 56, 56, 56, 55, 54, 53, 54, 54, 54, 54, 53, 53, 53, 53, 53, 52, 52, 52, 50, 47, 45, 44, 45, 46, 48, 50, 52, 55, 56, 56, 56, 57, 58, 60, 60, 57, 54, 50, 48, 46, 45, 44, 43, 42, 40, 39, 37, 36, 35, 34, 33, 32, 31, 31, 31, 30, 30, 30, 31, 31, 31, 31, 31, 31, 32, 32, 32, 31, 31, 30, 30, 29, 29, 28, 28, 27, 26, 26, 26, 27, 27, 27, 28, 28, 28, 28, 29, 30, 32, 34, 36, 39, 42, 46, 50, 54, 58, 62, 66, 72, 77, 82, 87, 93, 99, 105, 111, 117, 123, 128, 134, 140, 147, 153, 161, 169, 176, 183, 190, 197, 202, 209, 217, 224, 231, 238, 244, 250, 253, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255]);
+             var pixels = imgctx.getImageData(0, 0, imgWidth, imgHeight);
+             var d = pixels.data;
+             //convert redscale to color gradient
+             for (var i = 0; i < d.length; i += 4) {
+                 var a = d[i]; //red pixel data as index
+                 if (a) {
+                     d[i] = rl[a];
+                     d[i + 1] = gl[a];
+                     d[i + 2] = bl[a];
+                 }
+             }
+             imgctx.putImageData(pixels, 0, 0);
+             return 1;
+         };
+         
+         //The canvas to display
+         var canvas = document.getElementById("myCanvas");
+         //The buffer canvas for bit-boundary block transfer(blitting)
+         var buffer = document.createElement('canvas');
+         var ctx = canvas.getContext("2d");
+         var btx = buffer.getContext("2d");
+         //block resolution
+         var bRes = 12;
+         //screen resolution - this is adjusted later based on performance
+         var screenres = 2;
+         //size the canvas
+         var xWidth = ctx.canvas.width = window.innerWidth / screenres,
+             yHeight = ctx.canvas.height = window.innerHeight / screenres,
+             bWidth = Math.round(xWidth / bRes),
+             bHeight = Math.round(yHeight / bRes);
+         //size the buffer so that each block is only a single pixel.
+         btx.canvas.width = bWidth;
+         btx.canvas.height = bHeight;
+         var currX = xWidth,
+             currY = yHeight,
+             actX = xWidth,
+             actY = yHeight;
+         //buffer the canvas offset because it's a slow function to call
+         var boffsetLeft = canvas.offsetLeft,
+             boffsetTop = canvas.offsetTop;
+         //these set the rate of heating and cooling. The pointer gets extra hot when it's moving.
+         var hot = 4095,
+             cold = 512 * 2,
+             extrahot = (131071 * 64) / bRes,
+             moving = 0;
+         //heatMap is the 2d array which stores the data of the heatmap
+         var heatMap = [];
+         for (var i = 0; i < bWidth + 1; i++) {
+             heatMap[i] = [];
+         }
+         //initialize heatMap values to 0
+         for (var i = 0; i < bWidth + 1; i++) {
+             for (var j = 0; j < bHeight; j++) {
+                 heatMap[i][j] = 0;
+             }
+         }
+         
+         function intToByte(x) {
+             //x no greater than 0-16777215 then shift to get 0-255
+             x = Math.min(16777215, x);
+             x = x >> 16;
+             //var rgb = '#' + gradient[x];
+             return x;
+         }
+         
+         function findxy(res, e) {
+             moving = 1;
+             //Get mouser pointer in relation to the window
+             currX = (e.clientX - boffsetLeft) / screenres;
+             currY = (e.clientY - boffsetTop) / screenres;
+             //center pointer and block
+             currX -= bRes / 2;
+             currY -= bRes / 2;
+             //Constrain the pointer value to within the canvas
+             currX = Math.min(Math.max(currX, 0), xWidth);
+             currY = Math.min(Math.max(currY, 0), yHeight);
+             actX = currX;
+             actY = currY;
+         }
+         // Set up touch events for mobile, etc
+         canvas.addEventListener("touchstart", function(e) {
+             mousePos = getTouchPos(canvas, e);
+             var touch = e.touches[0];
+             var mouseEvent = new MouseEvent("mousedown", {
+                 clientX: touch.clientX,
+                 clientY: touch.clientY
+             });
+             canvas.dispatchEvent(mouseEvent);
+         }, false);
+         canvas.addEventListener("touchend", function(e) {
+             var mouseEvent = new MouseEvent("mouseup", {});
+             canvas.dispatchEvent(mouseEvent);
+         }, false);
+         canvas.addEventListener("touchmove", function(e) {
+             var touch = e.touches[0];
+             var mouseEvent = new MouseEvent("mousemove", {
+                 clientX: touch.clientX,
+                 clientY: touch.clientY
+             });
+             canvas.dispatchEvent(mouseEvent);
+         }, false);
+         // Get the position of a touch relative to the canvas
+         function getTouchPos(canvasDom, touchEvent) {
+             var rect = canvasDom.getBoundingClientRect();
+             return {
+                 x: touchEvent.touches[0].clientX - rect.left,
+                 y: touchEvent.touches[0].clientY - rect.top
+             };
+         }
+         // Normal mouse event
+         canvas.addEventListener("mousemove", function(e) {
+             findxy('move', e)
+         }, false);
+         //Drawing and main loop timing
+         var lastFrameTimeMs = 0,
+             maxFPS = 60,
+             delta = 0,
+             timestep = 1000 / 60,
+             panicdelay=10;
+         
+         function update(delta) {
+             var heat = hot;
+             if (moving == 1) {
+                 heat = extrahot;
+                 moving = 0;
+             }
+             for (var i = 0; i < bWidth; i++) {
+                 for (var j = 0; j < bHeight; j++) {
+                     if (heatMap[i][j] > cold * delta) {
+                         heatMap[i][j] -= cold * delta; //cool block
+                     }
+                 }
+             }
+             //This is to heat the 4 blocks around the pointer
+             var x = Math.floor(currX / bRes);
+             var y = Math.floor(currY / bRes);
+             var h = (heat / 4) * delta;
+             if (heatMap[x][y] <= (16777215 + h * delta)) {
+                 heatMap[x][y] += h;
+             }
+             x = Math.round(currX / bRes);
+             y = Math.floor(currY / bRes);
+             if (heatMap[x][y] <= (16777215 + h * delta)) {
+                 heatMap[x][y] += h;
+             }
+             x = Math.floor(currX / bRes);
+             y = Math.round(currY / bRes);
+             if (heatMap[x][y] <= (16777215 + h * delta)) {
+                 heatMap[x][y] += h;
+             }
+             x = Math.round(currX / bRes);
+             y = Math.round(currY / bRes);
+             if (heatMap[x][y] <= (16777215 + h * delta)) {
+                 heatMap[x][y] += h;
+             }
+         }
+         
+         function draw() {
+             btx.fillStyle = "#000000";
+             btx.fillRect(0, 0, bWidth, bHeight);
+             for (var i = 0; i < bWidth; i++) {
+                 for (var j = 0; j < bHeight; j++) {
+                     if (heatMap[i][j] > 0) {
+                         //0-255
+                         var color = heatMap[i][j];
+                         btx.fillStyle = "rgb(" + intToByte(color).toString() + ",0,0)";
+                         btx.fillRect((i), (j), 1, 1);
+                     }
+                 }
+             }
+             //draw the pointer to screen
+             btx.fillStyle = "#FF0000";
+             btx.fillRect((actX / bRes) - .5, (actY / bRes) - .5, 2, 2);
+             //Safari doesn't support this. That's why I made my own blur filter.
+             //ctx.filter = 'blur('+((bRes)/screenres).toString()+'px)';
+             ctx.drawImage(buffer, 0, 0, bWidth, bHeight, 0, 0, xWidth, yHeight);
+             blurimg(ctx);
+             heatmap(ctx);
+         }
+         
+         function panic() {
+             delta = 0;
+         }
+         
+         function mainLoop(timestamp) {
+             // Throttle the frame rate.    
+             if (timestamp < lastFrameTimeMs + (1000 / maxFPS)) {
+                 requestAnimationFrame(mainLoop);
+                 return;
+             }
+             delta += timestamp - lastFrameTimeMs;
+             lastFrameTimeMs = timestamp;
+             var numUpdateSteps = 0;
+             while (delta >= timestep) {
+                 update(timestep);
+                 delta -= timestep;
+                 if (++numUpdateSteps > panicdelay) {
+                     panic();
+                     break;
+                 }
+             }
+             draw();
+             requestAnimationFrame(mainLoop);
+         }
+         //Event listener for resize adjustment
+         var resizeWin = function(bigger = 1) {
+             //resize buffer and canvas
+             xWidth = ctx.canvas.width = window.innerWidth / screenres;
+             yHeight = ctx.canvas.height = window.innerHeight / screenres;
+             bWidth = Math.round(xWidth / bRes);
+             bHeight = Math.round(yHeight / bRes);
+             //update the offset
+             boffsetLeft = canvas.offsetLeft,
+                 boffsetTop = canvas.offsetTop;
+             //size the buffer so that each block is only a single pixel.
+             btx.canvas.width = bWidth;
+             btx.canvas.height = bHeight;
+             if (bigger) {
+                 //initialize expanded space
+                 for (var i = 0; i < bWidth + 1; i++) {
+                     if (heatMap[i] === undefined) {
+                         heatMap[i] = [];
+                     }
+                 }
+                 //initialize heatMap values to 0
+                 for (var i = 0; i < bWidth + 1; i++) {
+                     for (var j = 0; j < bHeight; j++) {
+                         if (heatMap[i][j] === undefined) {
+                             heatMap[i][j] = 0;
+                         }
+                     }
+                 }
+             }
+         }
+         window.addEventListener("resize", resizeWin, true);
+         //start main loop
+         requestAnimationFrame(mainLoop);
+      </script>
+   </body>
